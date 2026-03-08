@@ -22,6 +22,7 @@ class User(Base):
     synced_at           = Column(DateTime)
 
     devices = relationship("Device", back_populates="user")
+    managed_devices = relationship("ManagedDevice", back_populates="user") 
 
     __table_args__ = (
         Index("ix_users_mail", "mail"),
@@ -86,4 +87,90 @@ class Device(Base):
         Index("ix_devices_os", "operating_system"),
         Index("ix_devices_is_compliant", "is_compliant"),
         Index("ix_devices_display_name", "display_name"),
+    )
+
+class ManagedDevice(Base):
+    __tablename__ = "managed_devices"
+
+    id                                      = Column(String, primary_key=True)
+
+    # FK to users
+    user_id                                 = Column(String, ForeignKey("users.id"), nullable=True)
+
+    # Core identity
+    device_name                             = Column(String)
+    managed_device_name                     = Column(String)
+    azure_ad_device_id                      = Column(String)
+    serial_number                           = Column(String)
+    imei                                    = Column(String)
+    meid                                    = Column(String)
+    iccid                                   = Column(String)
+    udid                                    = Column(String)
+    email_address                           = Column(String)
+    user_display_name                       = Column(String)
+    user_principal_name                     = Column(String)
+
+    # OS & hardware
+    operating_system                        = Column(String)
+    os_version                              = Column(String)
+    manufacturer                            = Column(String)
+    model                                   = Column(String)
+    phone_number                            = Column(String)
+    wi_fi_mac_address                       = Column(String)
+    ethernet_mac_address                    = Column(String)
+    free_storage_space_in_bytes             = Column(String)
+    total_storage_space_in_bytes            = Column(String)
+    physical_memory_in_bytes                = Column(String)
+    android_security_patch_level            = Column(String)
+
+    # Enrollment & management
+    device_enrollment_type                  = Column(String)
+    enrollment_profile_name                 = Column(String)
+    enrolled_datetime                       = Column(DateTime)
+    last_sync_datetime                      = Column(DateTime)
+    management_agent                        = Column(String)
+    management_state                        = Column(String)
+    management_certificate_expiration_date  = Column(DateTime)
+    managed_device_owner_type               = Column(String)
+    device_registration_state               = Column(String)
+    device_category_display_name            = Column(String)
+    azure_ad_registered                     = Column(Boolean)
+
+    # Compliance
+    compliance_state                        = Column(String)
+    compliance_grace_period_expiration_datetime = Column(DateTime)
+    is_encrypted                            = Column(Boolean)
+    is_supervised                           = Column(Boolean)
+    jail_broken                             = Column(String)   # "Unknown"/"False"/"True"
+    partner_reported_threat_state           = Column(String)
+    activation_lock_bypass_code             = Column(String)
+
+    # Exchange / EAS
+    eas_activated                           = Column(Boolean)
+    eas_activation_datetime                 = Column(DateTime)
+    eas_device_id                           = Column(String)
+    exchange_access_state                   = Column(String)
+    exchange_access_state_reason            = Column(String)
+    exchange_last_successful_sync_datetime  = Column(DateTime)
+
+    # Remote / misc
+    notes                                   = Column(Text)
+    require_user_enrollment_approval        = Column(Boolean)
+    remote_assistance_session_url           = Column(String)
+    remote_assistance_session_error_details = Column(String)
+    subscriber_carrier                      = Column(String)
+
+    # raw_json — catches configurationManagerClientEnabledFeatures_*
+    # deviceActionResults, deviceHealthAttestationState
+    raw_json                                = Column(Text)
+    synced_at                               = Column(DateTime)
+
+    # Relationship
+    user = relationship("User", back_populates="managed_devices")
+
+    __table_args__ = (
+        Index("ix_managed_devices_user_id", "user_id"),
+        Index("ix_managed_devices_os", "operating_system"),
+        Index("ix_managed_devices_compliance_state", "compliance_state"),
+        Index("ix_managed_devices_last_sync", "last_sync_datetime"),
     )
