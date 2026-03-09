@@ -4,17 +4,13 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 
 Base = declarative_base()  # module-level singleton
 
+
 class Database:
     def __init__(self, db_url: str):
-        self.engine = create_engine(
-            db_url,
-            connect_args={"check_same_thread": False}
-        )
+        self.engine = create_engine(db_url, connect_args={"check_same_thread": False})
         self._register_pragmas()
         self.SessionLocal = sessionmaker(
-            bind=self.engine,
-            autoflush=False,
-            autocommit=False
+            bind=self.engine, autoflush=False, autocommit=False
         )
 
     def _register_pragmas(self):

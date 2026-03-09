@@ -17,7 +17,7 @@ def dataverse_headers(access_token: str):
         "OData-MaxVersion": "4.0",
         "OData-Version": "4.0",
         "Accept": "application/json",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
 
 
@@ -29,6 +29,7 @@ def list_accounts(top: int = 10):
     resp = requests.get(url, headers=headers, params=params, timeout=30)
     resp.raise_for_status()
     return resp.json().get("value", [])
+
 
 """ def list_test_1(top: int = 5):
     #Fetch rows from the cr277_test_1 Dataverse table
@@ -57,12 +58,13 @@ def list_accounts(top: int = 10):
     return resp.json().get("value", [])
  """
 
+
 def create_dataverse_row(
     access_token: str,
     environment_url: str,
     entity_set_name: str,
-    table_logical_name:str,
-    row_data: dict
+    table_logical_name: str,
+    row_data: dict,
 ) -> str:
     """
     Creates a Dataverse row and returns the row GUID.
@@ -72,7 +74,7 @@ def create_dataverse_row(
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
-        "Prefer": "return=representation"
+        "Prefer": "return=representation",
     }
 
     response = requests.post(url, headers=headers, json=row_data)
@@ -80,7 +82,8 @@ def create_dataverse_row(
 
     return response.json()[f"{table_logical_name}id"]
 
-#csv upload using simple patch http request
+
+# csv upload using simple patch http request
 """ def upload_csv_file(entity_uri: str, csv_path: str,file_column: str):
     
     #Upload CSV to Dataverse using attachment navigation property.
@@ -101,18 +104,19 @@ def create_dataverse_row(
     resp.raise_for_status()
     print(" CSV uploaded successfully")
  """
- 
- #csv upload funtion using InitializeFileBlocksUpload action
+
+
+# csv upload funtion using InitializeFileBlocksUpload action
 def upload_file_to_dataverse(
     access_token: str,
-    environment_url: str,      # https://org.crm.dynamics.com
+    environment_url: str,  # https://org.crm.dynamics.com
     entity_logical_name: str,  # account
-    primary_key_name: str,     # accountid
-    entity_id: str,            # GUID
-    file_column_name: str,     # sample_filecolumn (lowercase)
+    primary_key_name: str,  # accountid
+    entity_id: str,  # GUID
+    file_column_name: str,  # sample_filecolumn (lowercase)
     file_path: Path,
     mime_type: str = "application/octet-stream",
-    max_size_kb: int | None = None
+    max_size_kb: int | None = None,
 ) -> str:
     """
     Uploads a file to a Dataverse file column using block upload APIs.
@@ -137,10 +141,10 @@ def upload_file_to_dataverse(
     init_payload = {
         "Target": {
             "@odata.type": f"Microsoft.Dynamics.CRM.{entity_logical_name}",
-            primary_key_name: entity_id
+            primary_key_name: entity_id,
         },
         "FileAttributeName": file_column_name,
-        "FileName": file_path.name
+        "FileName": file_path.name,
     }
 
     init_resp = requests.post(init_url, headers=headers, json=init_payload)
@@ -161,16 +165,16 @@ def upload_file_to_dataverse(
             if not chunk:
                 break
 
-            block_id = base64.b64encode(
-                str(uuid.uuid4()).encode("utf-8")
-            ).decode("utf-8")
+            block_id = base64.b64encode(str(uuid.uuid4()).encode("utf-8")).decode(
+                "utf-8"
+            )
 
             block_ids.append(block_id)
 
             upload_payload = {
                 "BlockId": block_id,
                 "BlockData": base64.b64encode(chunk).decode("utf-8"),
-                "FileContinuationToken": file_continuation_token
+                "FileContinuationToken": file_continuation_token,
             }
 
             resp = requests.post(upload_block_url, headers=headers, json=upload_payload)
@@ -185,13 +189,14 @@ def upload_file_to_dataverse(
         "FileName": file_path.name,
         "MimeType": mime_type,
         "BlockList": block_ids,
-        "FileContinuationToken": file_continuation_token
+        "FileContinuationToken": file_continuation_token,
     }
 
     commit_resp = requests.post(commit_url, headers=headers, json=commit_payload)
     commit_resp.raise_for_status()
 
     return commit_resp.json()["FileId"]
+
 
 def download_csv_file(entity_uri: str, file_column: str, output_path: str):
     token = get_dataverse_token()
