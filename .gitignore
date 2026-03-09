@@ -111,3 +111,4 @@ test_scripts/graph_test_output/
 *.db
 .delta_links.json
 debug_dumps/
+*.csv
