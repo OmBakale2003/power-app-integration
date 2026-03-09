@@ -1,6 +1,7 @@
 import msal
-import config  
+import config
 import requests
+
 
 def get_dataverse_token() -> str:
     app = msal.ConfidentialClientApplication(
@@ -16,6 +17,7 @@ def get_dataverse_token() -> str:
     if not access_token:
         raise RuntimeError(f"Failed to get token: {result}")
     return access_token
+
 
 def get_graph_token() -> str:
     app = msal.ConfidentialClientApplication(
@@ -35,7 +37,7 @@ def get_graph_token() -> str:
 
 def whoami():
     token = get_dataverse_token()
-    base = config.ENV_URL.rstrip('/')
+    base = config.ENV_URL.rstrip("/")
     url = f"{base}/api/data/v9.2/WhoAmI"
     headers = {
         "Authorization": f"Bearer {token}",

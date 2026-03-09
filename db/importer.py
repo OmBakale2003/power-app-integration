@@ -8,13 +8,13 @@ from sqlalchemy.orm import Session
 from db.models import ManagedDevice, User, Device
 
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s"
+    level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s"
 )
 
 logger = logging.getLogger(__name__)
 
-# Parsers                                                              
+# Parsers
+
 
 def _parse_dt(val: str | None) -> datetime | None:
     if not val or val.strip() in ("", "None"):
@@ -32,7 +32,7 @@ def _parse_bool(val: str | None) -> bool | None:
     return val.strip().lower() in ("true", "1", "yes")
 
 
-def _parse_registered_devices(raw: str) ->list[str]:
+def _parse_registered_devices(raw: str) -> list[str]:
     """
     Parses the registeredDevices column.
     Format: pipe-separated Python dict strings.
@@ -53,7 +53,9 @@ def _parse_registered_devices(raw: str) ->list[str]:
             if graph_id:
                 device_ids.append(graph_id)
         except (ValueError, SyntaxError) as e:
-            logger.warning(f"Could not parse registeredDevices entry: {entry[:80]} — {e}")
+            logger.warning(
+                f"Could not parse registeredDevices entry: {entry[:80]} — {e}"
+            )
 
     return device_ids
 
@@ -72,7 +74,9 @@ def _pack_extension_attrs(row: dict) -> str | None:
     }
     return json.dumps(ext_dict, ensure_ascii=False) if ext_dict else None
 
+
 MANAGED_DEVICE_CM_FEATURES_PREFIX = "configurationManagerClientEnabledFeatures"
+
 
 def _pack_managed_device_raw_json(row: dict) -> str | None:
     """
@@ -94,7 +98,9 @@ def _pack_managed_device_raw_json(row: dict) -> str | None:
 
     return json.dumps(packed, ensure_ascii=False) if packed else None
 
-# User import                                                          
+
+# User import
+
 
 def import_users(filepath: str, session: Session) -> dict[str, str]:
     """
@@ -136,11 +142,14 @@ def import_users(filepath: str, session: Session) -> dict[str, str]:
             count += 1
 
     session.flush()
-    logger.info(f"Upserted {count} users | Mapped {len(device_to_user)} devices to users")
+    logger.info(
+        f"Upserted {count} users | Mapped {len(device_to_user)} devices to users"
+    )
     return device_to_user
 
 
-# Device import                                                        #
+# Device import
+
 
 def import_devices(filepath: str, session: Session, device_to_user: dict[str, str]):
     """
@@ -160,19 +169,23 @@ def import_devices(filepath: str, session: Session, device_to_user: dict[str, st
 
             if not user_id:
                 unmatched += 1
-                logger.debug(f"Device {device_graph_id} has no matching user — user_id will be NULL")
+                logger.debug(
+                    f"Device {device_graph_id} has no matching user — user_id will be NULL"
+                )
 
             device = Device(
                 id=device_graph_id,
                 user_id=user_id,
-
                 account_enabled=_parse_bool(row.get("accountEnabled")),
                 alternative_security_ids=row.get("alternativeSecurityIds"),
-                approximate_last_signin_datetime=_parse_dt(row.get("approximateLastSignInDateTime")),
-                compliance_expiration_datetime=_parse_dt(row.get("complianceExpirationDateTime")),
+                approximate_last_signin_datetime=_parse_dt(
+                    row.get("approximateLastSignInDateTime")
+                ),
+                compliance_expiration_datetime=_parse_dt(
+                    row.get("complianceExpirationDateTime")
+                ),
                 created_datetime=_parse_dt(row.get("createdDateTime")),
                 deleted_datetime=_parse_dt(row.get("deletedDateTime")),
-
                 device_category=row.get("deviceCategory"),
                 device_id=row.get("deviceId"),
                 device_metadata=row.get("deviceMetadata"),
@@ -182,7 +195,6 @@ def import_devices(filepath: str, session: Session, device_to_user: dict[str, st
                 domain_name=row.get("domainName"),
                 enrollment_profile_name=row.get("enrollmentProfileName"),
                 enrollment_type=row.get("enrollmentType"),
-
                 external_source_name=row.get("externalSourceName"),
                 is_compliant=_parse_bool(row.get("isCompliant")),
                 is_managed=_parse_bool(row.get("isManaged")),
@@ -191,20 +203,18 @@ def import_devices(filepath: str, session: Session, device_to_user: dict[str, st
                 manufacturer=row.get("manufacturer"),
                 mdm_app_id=row.get("mdmAppId"),
                 model=row.get("model"),
-
-                on_premises_last_sync_datetime=_parse_dt(row.get("onPremisesLastSyncDateTime")),
+                on_premises_last_sync_datetime=_parse_dt(
+                    row.get("onPremisesLastSyncDateTime")
+                ),
                 on_premises_sync_enabled=_parse_bool(row.get("onPremisesSyncEnabled")),
-
                 operating_system=row.get("operatingSystem"),
                 operating_system_version=row.get("operatingSystemVersion"),
-
                 physical_ids=row.get("physicalIds"),
                 profile_type=row.get("profileType"),
                 registration_datetime=_parse_dt(row.get("registrationDateTime")),
                 source_type=row.get("sourceType"),
                 system_labels=row.get("systemLabels"),
                 trust_type=row.get("trustType"),
-
                 raw_json=_pack_extension_attrs(row),
                 synced_at=datetime.now(timezone.utc),
             )
@@ -214,13 +224,12 @@ def import_devices(filepath: str, session: Session, device_to_user: dict[str, st
     session.flush()
     logger.info(f"Upserted {count} devices | {unmatched} devices had no matching user")
 
+
 def import_managed_devices(filepath: str, session: Session):
     logger.info(f"Importing managed devices from: {filepath}")
 
     # Build set of known user IDs to validate FK before insert
-    valid_user_ids = set(
-        row[0] for row in session.execute(select(User.id)).all()
-    )
+    valid_user_ids = set(row[0] for row in session.execute(select(User.id)).all())
     logger.info(f"Found {len(valid_user_ids)} valid users for FK validation")
 
     count = 0
@@ -235,14 +244,15 @@ def import_managed_devices(filepath: str, session: Session):
             user_id = raw_user_id if raw_user_id in valid_user_ids else None
             if not user_id:
                 unmatched += 1
-                logger.debug(f"ManagedDevice {row.get('id')} userId '{raw_user_id}' "
-                             f"not found in users table — setting NULL")
+                logger.debug(
+                    f"ManagedDevice {row.get('id')} userId '{raw_user_id}' "
+                    f"not found in users table — setting NULL"
+                )
 
             managed_device = ManagedDevice(
                 id=row["id"],
                 user_id=user_id,
                 azure_ad_device_id=row.get("azureADDeviceId"),  # plain string, no FK
-
                 device_name=row.get("deviceName"),
                 managed_device_name=row.get("managedDeviceName"),
                 serial_number=row.get("serialNumber"),
@@ -253,7 +263,6 @@ def import_managed_devices(filepath: str, session: Session):
                 email_address=row.get("emailAddress"),
                 user_display_name=row.get("userDisplayName"),
                 user_principal_name=row.get("userPrincipalName"),
-
                 operating_system=row.get("operatingSystem"),
                 os_version=row.get("osVersion"),
                 manufacturer=row.get("manufacturer"),
@@ -265,40 +274,45 @@ def import_managed_devices(filepath: str, session: Session):
                 total_storage_space_in_bytes=row.get("totalStorageSpaceInBytes"),
                 physical_memory_in_bytes=row.get("physicalMemoryInBytes"),
                 android_security_patch_level=row.get("androidSecurityPatchLevel"),
-
                 device_enrollment_type=row.get("deviceEnrollmentType"),
                 enrollment_profile_name=row.get("enrollmentProfileName"),
                 enrolled_datetime=_parse_dt(row.get("enrolledDateTime")),
                 last_sync_datetime=_parse_dt(row.get("lastSyncDateTime")),
                 management_agent=row.get("managementAgent"),
                 management_state=row.get("managementState"),
-                management_certificate_expiration_date=_parse_dt(row.get("managementCertificateExpirationDate")),
+                management_certificate_expiration_date=_parse_dt(
+                    row.get("managementCertificateExpirationDate")
+                ),
                 managed_device_owner_type=row.get("managedDeviceOwnerType"),
                 device_registration_state=row.get("deviceRegistrationState"),
                 device_category_display_name=row.get("deviceCategoryDisplayName"),
                 azure_ad_registered=_parse_bool(row.get("azureADRegistered")),
-
                 compliance_state=row.get("complianceState"),
-                compliance_grace_period_expiration_datetime=_parse_dt(row.get("complianceGracePeriodExpirationDateTime")),
+                compliance_grace_period_expiration_datetime=_parse_dt(
+                    row.get("complianceGracePeriodExpirationDateTime")
+                ),
                 is_encrypted=_parse_bool(row.get("isEncrypted")),
                 is_supervised=_parse_bool(row.get("isSupervised")),
                 jail_broken=row.get("jailBroken"),
                 partner_reported_threat_state=row.get("partnerReportedThreatState"),
                 activation_lock_bypass_code=row.get("activationLockBypassCode"),
-
                 eas_activated=_parse_bool(row.get("easActivated")),
                 eas_activation_datetime=_parse_dt(row.get("easActivationDateTime")),
                 eas_device_id=row.get("easDeviceId"),
                 exchange_access_state=row.get("exchangeAccessState"),
                 exchange_access_state_reason=row.get("exchangeAccessStateReason"),
-                exchange_last_successful_sync_datetime=_parse_dt(row.get("exchangeLastSuccessfulSyncDateTime")),
-
+                exchange_last_successful_sync_datetime=_parse_dt(
+                    row.get("exchangeLastSuccessfulSyncDateTime")
+                ),
                 notes=row.get("notes"),
-                require_user_enrollment_approval=_parse_bool(row.get("requireUserEnrollmentApproval")),
+                require_user_enrollment_approval=_parse_bool(
+                    row.get("requireUserEnrollmentApproval")
+                ),
                 remote_assistance_session_url=row.get("remoteAssistanceSessionUrl"),
-                remote_assistance_session_error_details=row.get("remoteAssistanceSessionErrorDetails"),
+                remote_assistance_session_error_details=row.get(
+                    "remoteAssistanceSessionErrorDetails"
+                ),
                 subscriber_carrier=row.get("subscriberCarrier"),
-
                 raw_json=_pack_managed_device_raw_json(row),
                 synced_at=datetime.now(timezone.utc),
             )
@@ -306,12 +320,17 @@ def import_managed_devices(filepath: str, session: Session):
             count += 1
 
     session.flush()
-    logger.info(f"Upserted {count} managed devices | {unmatched} had unresolvable user_id")
+    logger.info(
+        f"Upserted {count} managed devices | {unmatched} had unresolvable user_id"
+    )
 
 
-# Orchestrator                                                         
+# Orchestrator
 
-def run_import(users_csv: str, devices_csv: str,managed_devices_csv : str, session: Session):
+
+def run_import(
+    users_csv: str, devices_csv: str, managed_devices_csv: str, session: Session
+):
     """
     Full import orchestration — users first, then devices.
     Session commit is handled by the caller.

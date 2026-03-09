@@ -9,5 +9,5 @@ with db.get_session() as session:
         users_csv="./test_scripts/graph_test_output/all_users_registered_devices_20260302_104806.csv",
         devices_csv="./test_scripts/graph_test_output/all_ad_devices_20260303_084608.csv",
         managed_devices_csv="./test_scripts/graph_test_output/all_managed_devices_20260302_085539.csv",
-        session=session
+        session=session,
     )

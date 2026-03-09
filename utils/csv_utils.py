@@ -16,9 +16,7 @@ def flatten_row(row: dict, parent_key: str = "", sep: str = "_") -> dict:
             # Convert list values to pipe-separated string
             if all(isinstance(v, dict) for v in value):
                 # If list of dicts → extract keys or stringify
-                items[new_key] = "|".join(
-                    str(v.get("key", v)) for v in value
-                )
+                items[new_key] = "|".join(str(v.get("key", v)) for v in value)
             else:
                 items[new_key] = "|".join(str(v) for v in value)
 
