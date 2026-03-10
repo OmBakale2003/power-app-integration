@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from db.models import ManagedDevice, User
 from pipelines.graph_base_pipline import GraphBasePipeline
 from data_extraction.graph_data_extractor import GraphDataExtractor
+from utils import dump_to_json
 
 logger = logging.getLogger(__name__)
 

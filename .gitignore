@@ -112,3 +112,4 @@ test_scripts/graph_test_output/
 .delta_links.json
 debug_dumps/
 *.csv
+data_cache/

@@ -4,6 +4,7 @@ from data_extraction.graph_data_extractor import GraphDataExtractor
 from pipelines.user_data_pipeline import UsersPipeline
 from pipelines.device_data_pipeline import DevicesPipeline
 from pipelines.managed_device_data_pipeline import ManagedDevicesPipeline
+from urllib3.exceptions import SSLError
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
@@ -17,23 +18,36 @@ def main():
 
     extractor = GraphDataExtractor()
 
-    # Sync users
-    """ with db.get_session() as session:
-        UsersPipeline(extractor).run(session)
+    max_retries: int = 3
+    curr_retry: int = 0
 
-    # Sync devices
-    devices_pipeline = DevicesPipeline(extractor)
-    with db.get_session() as session:
-        devices_pipeline.run(session)
+    while True:
+        try:
+            # Sync users
+            with db.get_session() as session:
+                UsersPipeline(extractor).run(session)
 
-    # Backfill device → user FK
-    # Runs after BOTH pipelines are committed so all FKs are resolvable
-    with db.get_session() as session:
-        devices_pipeline.backfill_user_ids(session) """
+            # Sync devices
+            devices_pipeline = DevicesPipeline(extractor)
+            with db.get_session() as session:
+                devices_pipeline.run(session)
 
-    # Sync managedDevices
-    with db.get_session() as session:
-        ManagedDevicesPipeline(extractor).run(session)
+            # Backfill device → user FK
+            # Runs after BOTH pipelines are committed so all FKs are resolvable
+            with db.get_session() as session:
+                devices_pipeline.backfill_user_ids(session)
+
+            # Sync managedDevices
+            with db.get_session() as session:
+                ManagedDevicesPipeline(extractor).run(session)
+
+            break
+        except SSLError:
+            logger.info("SSLError occured , retrying again | retries left")
+            if max_retries == curr_retry:
+                logger.warning("max retries reached for running the data pipelines")
+                break
+            continue
 
 
 if __name__ == "__main__":
