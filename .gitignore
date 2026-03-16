@@ -109,6 +109,7 @@ test_scripts/graph_test_output/
 
 #exclude the db files
 *.db
+*.db-*
 .delta_links.json
 debug_dumps/
 *.csv
