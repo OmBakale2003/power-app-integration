@@ -4,6 +4,7 @@ import sqlite3
 app = FastAPI()
 DB_name = "data.db"
 
+
 def query_db(query, params=()):
     conn = sqlite3.connect(DB_name)
     cursor = conn.cursor()
@@ -19,6 +20,7 @@ def get_all_users():
     result = query_db("select count(*) as total_users from users")
     return result
 
+
 @app.get("/user/byLoc")
 def get_user_byLoc(location: str):
     query = """
@@ -28,6 +30,7 @@ def get_user_byLoc(location: str):
     """
     rows = query_db(query, (location,))
     return rows
+
 
 @app.get("/user/user_By_mail")
 def get_user_byMail(mail: str):
@@ -39,6 +42,7 @@ def get_user_byMail(mail: str):
     rows = query_db(query, (mail,))
     return rows
 
+
 @app.get("/user/user_By_id")
 def get_user_byId(Id: str):
     query = """
@@ -48,6 +52,7 @@ def get_user_byId(Id: str):
     """
     rows = query_db(query, (Id,))
     return rows
+
 
 @app.get("/device/count")
 def get_all_devices():
@@ -65,6 +70,7 @@ def get_Device_byUserId(UserId: str):
     rows = query_db(query, (UserId,))
     return rows
 
+
 @app.get("/device/Count_managed_Devices")
 def Count_ManagedDevices():
     query = """
@@ -74,6 +80,7 @@ def Count_ManagedDevices():
     """
     rows = query_db(query)
     return rows
+
 
 @app.get("/device/Get_all_ManagedDevices")
 def get_ManagedDevices(device_ownerShip: str):
@@ -85,6 +92,7 @@ def get_ManagedDevices(device_ownerShip: str):
     rows = query_db(query, (device_ownerShip,))
     return rows
 
+
 @app.get("/device/get_using_wifi_Mac")
 def get_device_ByMac(wi_fi_mac_address: str):
     query = """
@@ -95,6 +103,7 @@ def get_device_ByMac(wi_fi_mac_address: str):
     rows = query_db(query, (wi_fi_mac_address,))
     return rows
 
+
 @app.get("/user/byJobTitle")
 def get_users_by_job_title(job_title: str):
     query = """
@@ -104,6 +113,7 @@ def get_users_by_job_title(job_title: str):
     """
     rows = query_db(query, (job_title,))
     return rows
+
 
 @app.get("/device/byUserMail")
 def get_devices_by_user_mail(mail: str):
@@ -123,6 +133,7 @@ def get_devices_by_user_mail(mail: str):
     rows = query_db(query, (mail,))
     return rows
 
+
 @app.get("/device/getAllDeviceUsingMail")
 def get_devices_by_user_mail_all(mail: str):
     query = """
@@ -140,6 +151,7 @@ def get_devices_by_user_mail_all(mail: str):
     rows = query_db(query, (mail,))
     return rows
 
+
 @app.get("/device/getUsingAd")
 def getDeviceByAd(azure_ad_device_id: str):
     query = """
@@ -156,6 +168,7 @@ def getDeviceByAd(azure_ad_device_id: str):
     """
     rows = query_db(query, (azure_ad_device_id,))
     return rows
+
 
 @app.get("/devices/by-os")
 def get_devices_by_os(operating_system: str):
@@ -186,6 +199,7 @@ def get_windows_devices():
     rows = query_db(query)
     return rows
 
+
 @app.get("/devices/count/iphone")
 def get_ios_devices():
     query = """
@@ -195,6 +209,7 @@ def get_ios_devices():
     rows = query_db(query)
     return rows
 
+
 @app.get("/devices/count/MacOS")
 def get_macos_devices():
     query = """
@@ -202,6 +217,7 @@ def get_macos_devices():
     """
     rows = query_db(query)
     return rows
+
 
 @app.get("/devices/count/Android")
 def get_android_devices():
@@ -212,6 +228,7 @@ def get_android_devices():
     rows = query_db(query)
     return rows
 
+
 @app.get("/devices/count/MacMDM")
 def get_macmdm_devices():
     query = """
@@ -219,6 +236,7 @@ def get_macmdm_devices():
     """
     rows = query_db(query)
     return rows
+
 
 @app.get("/devices/count/Linux")
 def get_macmdm_devices():
@@ -231,10 +249,11 @@ def get_macmdm_devices():
 
 @app.get("/ManagedDevices")
 def get_all_managedDevices():
-    query="""
+    query = """
     select count(*) from managed_devices"""
-    rows=query_db(query)
+    rows = query_db(query)
     return rows
+
 
 @app.get("/ManagedDevices/ios")
 def get_ios_devices():
@@ -333,6 +352,7 @@ def get_windows_devices():
     rows = query_db(query)
     return rows
 
+
 @app.get("/ManagedDevices/count/iphone")
 def get_ios_devices():
     query = """
@@ -342,6 +362,7 @@ def get_ios_devices():
     rows = query_db(query)
     return rows
 
+
 @app.get("/ManagedDevices/count/MacOS")
 def get_macos_devices():
     query = """
@@ -349,6 +370,7 @@ def get_macos_devices():
     """
     rows = query_db(query)
     return rows
+
 
 @app.get("/ManagedDevices/count/Android")
 def get_android_devices():
@@ -359,6 +381,7 @@ def get_android_devices():
     rows = query_db(query)
     return rows
 
+
 @app.get("/ManagedDevices/count/MacMDM")
 def get_macmdm_devices():
     query = """
@@ -366,6 +389,7 @@ def get_macmdm_devices():
     """
     rows = query_db(query)
     return rows
+
 
 @app.get("/ManagedDevices/count/Linux")
 def get_macmdm_devices():
