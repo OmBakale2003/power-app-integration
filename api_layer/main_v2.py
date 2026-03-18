@@ -261,34 +261,6 @@ def get_devices_by_mail(mail: str, db: Session = Depends(get_db)):
     return [row._asdict() for row in devices]
 
 
-@app.get("/devices/by-azure-ad-id")
-def get_device_by_azure_ad_id(azure_ad_device_id: str, db: Session = Depends(get_db)):
-    devices = (
-        db.query(
-            ManagedDevice.id,
-            ManagedDevice.user_id,
-            ManagedDevice.device_name,
-            ManagedDevice.managed_device_name,
-            ManagedDevice.email_address,
-            ManagedDevice.user_display_name,
-            ManagedDevice.model,
-        )
-        .filter(ManagedDevice.azure_ad_device_id == azure_ad_device_id)
-        .all()
-    )
-    return [row._asdict() for row in devices]
-
-
-@app.get("/devices/by-wifi-mac")
-def get_device_by_wifi_mac(wi_fi_mac_address: str, db: Session = Depends(get_db)):
-    devices = (
-        db.query(ManagedDevice)
-        .filter(ManagedDevice.wi_fi_mac_address == wi_fi_mac_address)
-        .all()
-    )
-    return devices
-
-
 # MANAGED DEVICES
 
 _MANAGED_DEVICE_FIELDS = (
@@ -333,6 +305,16 @@ def count_managed_devices_all_locations(db: Session = Depends(get_db)):
         .all()
     )
     return [{"location": row.office_location, "count": row.count} for row in results]
+
+
+@app.get("/managed-devices/by-wifi-mac")
+def get_device_by_wifi_mac(wi_fi_mac_address: str, db: Session = Depends(get_db)):
+    devices = (
+        db.query(ManagedDevice)
+        .filter(ManagedDevice.wi_fi_mac_address == wi_fi_mac_address)
+        .all()
+    )
+    return devices
 
 
 @app.get("/managed-devices/count/unassigned")
@@ -395,24 +377,32 @@ def count_managed_android(db: Session = Depends(get_db)):
     return {"count": total}
 
 
-@app.get("/managed-devices/count/mac-mdm")
-def count_managed_macmdm(db: Session = Depends(get_db)):
-    total = (
-        db.query(func.count(ManagedDevice.id))
-        .filter(ManagedDevice.operating_system == "MacMDM")
-        .scalar()
-    )
-    return {"count": total}
-
-
 @app.get("/managed-devices/count/linux")
 def count_managed_linux(db: Session = Depends(get_db)):
     total = (
         db.query(func.count(ManagedDevice.id))
-        .filter(ManagedDevice.operating_system == "Linux")
+        .filter(ManagedDevice.operating_system == "Linux (ubuntu)")
         .scalar()
     )
     return {"count": total}
+
+
+@app.get("/managed-devices/by-azure-ad-id")
+def get_device_by_azure_ad_id(azure_ad_device_id: str, db: Session = Depends(get_db)):
+    devices = (
+        db.query(
+            ManagedDevice.id,
+            ManagedDevice.user_id,
+            ManagedDevice.device_name,
+            ManagedDevice.managed_device_name,
+            ManagedDevice.email_address,
+            ManagedDevice.user_display_name,
+            ManagedDevice.model,
+        )
+        .filter(ManagedDevice.azure_ad_device_id == azure_ad_device_id)
+        .all()
+    )
+    return [row._asdict() for row in devices]
 
 
 @app.get("/managed-devices/ios")
