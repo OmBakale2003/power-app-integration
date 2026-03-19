@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from db.database import Database
@@ -462,3 +462,32 @@ def get_managed_devices_by_mail(mail: str, db: Session = Depends(get_db)):
         .all()
     )
     return [row._asdict() for row in devices]
+
+
+# specific endpoints for power bi.
+@app.get("/power-bi/api-1")
+def get_count_of_devices_groupedby_user_job_titles_and_location(
+    db: Session = Depends(get_db),
+):
+    try:
+        result = (
+            db.query(
+                func.count(ManagedDevice.id).label("device_count"),
+                User.job_title,
+                User.office_location,
+            )
+            .join(User, User.id == ManagedDevice.user_id)
+            .group_by(User.office_location, User.job_title)
+            .all()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return [
+        {
+            "device_count": row.device_count,
+            "job_title": row.job_title,
+            "office_location": row.office_location,
+        }
+        for row in result
+    ]
