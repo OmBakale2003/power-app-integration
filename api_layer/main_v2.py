@@ -14,6 +14,12 @@ def get_db():
         yield session
 
 
+# -- default path response
+@app.get("/")
+def home_path():
+    return "server is up and running."
+
+
 # USERS
 @app.get("/users/all")
 def get_all_users(db: Session = Depends(get_db)):
@@ -477,6 +483,7 @@ def get_count_of_devices_groupedby_user_job_titles_and_location(
                 User.office_location,
             )
             .join(User, User.id == ManagedDevice.user_id)
+            .filter(User.office_location.is_not(None))
             .group_by(User.office_location, User.job_title)
             .all()
         )
@@ -491,3 +498,172 @@ def get_count_of_devices_groupedby_user_job_titles_and_location(
         }
         for row in result
     ]
+
+
+# Paginated APIs
+@app.get("/users")
+def user_paginated_api(
+    _page: int | None = None,
+    _select: str | None = None,
+    _skip: int | None = None,
+    _limit: int = 10,
+    db: Session = Depends(get_db),
+):
+    selected_fields = [f.strip() for f in _select.split(",")] if _select else None
+
+    if selected_fields:
+        column_attributes = []
+        for field in selected_fields:
+            attr = getattr(User, field, None)
+            if attr is None:
+                raise HTTPException(status_code=400, detail=f"Invalid field: '{field}'")
+            column_attributes.append(attr)
+        query = db.query(*column_attributes)
+    else:
+        query = db.query(User)
+
+    total = query.count()
+
+    if _page is not None:
+        if _skip is not None:
+            raise HTTPException(
+                status_code=400, detail="Use either _page or _skip, not both"
+            )
+        _skip = (_page - 1) * _limit
+
+    if _skip is not None:
+        query = query.offset(_skip)
+
+    query = query.limit(_limit)
+    data = query.all()
+
+    serialized = [dict(row._mapping) for row in data] if selected_fields else data
+
+    next_idx = (_skip or 0) + len(data)
+    can_continue = next_idx < total
+
+    return {
+        "data": serialized,
+        "pagination": {
+            "total_count": total,
+            "current_count": len(data),
+            "can_continue": can_continue,
+            "current_page": _page,
+            "current_skip": _skip,
+            "next_page": _page + 1 if _page and can_continue else None,
+            "next_skip": next_idx if can_continue else None,
+            "limit": _limit,
+        },
+    }
+
+
+@app.get("/devices")
+def devices_paginated_api(
+    _page: int | None = None,
+    _select: str | None = None,
+    _skip: int | None = None,
+    _limit: int = 10,
+    db: Session = Depends(get_db),
+):
+    selected_fields = [f.strip() for f in _select.split(",")] if _select else None
+
+    if selected_fields:
+        column_attributes = []
+        for field in selected_fields:
+            attr = getattr(Device, field, None)
+            if attr is None:
+                raise HTTPException(status_code=400, detail=f"Invalid field: '{field}'")
+            column_attributes.append(attr)
+        query = db.query(*column_attributes)
+    else:
+        query = db.query(Device)
+
+    total = query.count()
+
+    if _page is not None:
+        if _skip is not None:
+            raise HTTPException(
+                status_code=400, detail="Use either _page or _skip, not both"
+            )
+        _skip = (_page - 1) * _limit
+
+    if _skip is not None:
+        query = query.offset(_skip)
+
+    query = query.limit(_limit)
+    data = query.all()
+
+    serialized = [dict(row._mapping) for row in data] if selected_fields else data
+
+    next_idx = (_skip or 0) + len(data)
+    can_continue = next_idx < total
+
+    return {
+        "data": serialized,
+        "pagination": {
+            "total_count": total,
+            "current_count": len(data),
+            "can_continue": can_continue,
+            "current_page": _page,
+            "current_skip": _skip,
+            "next_page": _page + 1 if _page and can_continue else None,
+            "next_skip": next_idx if can_continue else None,
+            "limit": _limit,
+        },
+    }
+
+
+@app.get("/managed_devices")
+def managed_devices_paginated_api(
+    _page: int | None = None,
+    _select: str | None = None,
+    _skip: int | None = None,
+    _limit: int = 10,
+    db: Session = Depends(get_db),
+):
+    selected_fields = [f.strip() for f in _select.split(",")] if _select else None
+
+    if selected_fields:
+        column_attributes = []
+        for field in selected_fields:
+            attr = getattr(ManagedDevice, field, None)
+            if attr is None:
+                raise HTTPException(status_code=400, detail=f"Invalid field: '{field}'")
+            column_attributes.append(attr)
+        query = db.query(*column_attributes)
+    else:
+        query = db.query(ManagedDevice)
+
+    total = query.count()
+
+    if _page is not None:
+        if _skip is not None:
+            raise HTTPException(
+                status_code=400, detail="Use either _page or _skip, not both"
+            )
+        _skip = (_page - 1) * _limit
+
+    if _skip is not None:
+        query = query.offset(_skip)
+
+    query = query.limit(_limit)
+    data = query.all()
+
+    serialized = [dict(row._mapping) for row in data] if selected_fields else data
+
+    next_idx = (_skip or 0) + len(data)
+    can_continue = next_idx < total
+
+    return {
+        "data": serialized,
+        "pagination": {
+            "total_count": total,
+            "current_count": len(data),
+            "can_continue": can_continue,
+            "current_page": _page,
+            "current_skip": _skip,
+            "next_page": _page + 1 if _page and can_continue else None,
+            "next_skip": next_idx if can_continue else None,
+            "limit": _limit,
+        },
+    }
