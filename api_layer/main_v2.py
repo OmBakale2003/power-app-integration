@@ -523,30 +523,42 @@ def user_paginated_api(
         query = db.query(User)
 
     total = query.count()
+    full_data = query.all()
+
+    if _page is None and _skip is None:
+        return {
+            "data": [dict(row._mapping) for row in full_data]
+            if selected_fields
+            else full_data
+        }
 
     if _page is not None:
         if _skip is not None:
             raise HTTPException(
                 status_code=400, detail="Use either _page or _skip, not both"
             )
-        _skip = (_page - 1) * _limit
+        _skip = (_page - 1) * _limit if _limit else 0
 
     if _skip is not None:
         query = query.offset(_skip)
 
     query = query.limit(_limit)
-    data = query.all()
+    paginated_data = query.all()
 
-    serialized = [dict(row._mapping) for row in data] if selected_fields else data
+    serialized = (
+        [dict(row._mapping) for row in paginated_data]
+        if selected_fields
+        else paginated_data
+    )
 
-    next_idx = (_skip or 0) + len(data)
+    next_idx = (_skip or 0) + len(paginated_data)
     can_continue = next_idx < total
 
     return {
         "data": serialized,
         "pagination": {
             "total_count": total,
-            "current_count": len(data),
+            "current_count": len(paginated_data),
             "can_continue": can_continue,
             "current_page": _page,
             "current_skip": _skip,
@@ -578,6 +590,15 @@ def devices_paginated_api(
     else:
         query = db.query(Device)
 
+    full_data = query.all()
+
+    if _page is None and _skip is None:
+        return {
+            "data": [dict(row._mapping) for row in full_data]
+            if selected_fields
+            else full_data
+        }
+
     total = query.count()
 
     if _page is not None:
@@ -591,18 +612,23 @@ def devices_paginated_api(
         query = query.offset(_skip)
 
     query = query.limit(_limit)
-    data = query.all()
 
-    serialized = [dict(row._mapping) for row in data] if selected_fields else data
+    paginated_data = query.all()
 
-    next_idx = (_skip or 0) + len(data)
+    serialized = (
+        [dict(row._mapping) for row in paginated_data]
+        if selected_fields
+        else paginated_data
+    )
+
+    next_idx = (_skip or 0) + len(paginated_data)
     can_continue = next_idx < total
 
     return {
         "data": serialized,
         "pagination": {
             "total_count": total,
-            "current_count": len(data),
+            "current_count": len(paginated_data),
             "can_continue": can_continue,
             "current_page": _page,
             "current_skip": _skip,
@@ -636,6 +662,15 @@ def managed_devices_paginated_api(
 
     total = query.count()
 
+    full_data = query.all()
+
+    if _page is None and _skip is None:
+        return {
+            "data": [dict(row._mapping) for row in full_data]
+            if selected_fields
+            else full_data
+        }
+
     if _page is not None:
         if _skip is not None:
             raise HTTPException(
@@ -647,18 +682,23 @@ def managed_devices_paginated_api(
         query = query.offset(_skip)
 
     query = query.limit(_limit)
-    data = query.all()
 
-    serialized = [dict(row._mapping) for row in data] if selected_fields else data
+    paginated_data = query.all()
 
-    next_idx = (_skip or 0) + len(data)
+    serialized = (
+        [dict(row._mapping) for row in paginated_data]
+        if selected_fields
+        else paginated_data
+    )
+
+    next_idx = (_skip or 0) + len(paginated_data)
     can_continue = next_idx < total
 
     return {
         "data": serialized,
         "pagination": {
             "total_count": total,
-            "current_count": len(data),
+            "current_count": len(paginated_data),
             "can_continue": can_continue,
             "current_page": _page,
             "current_skip": _skip,
