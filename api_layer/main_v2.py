@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from db.database import Database
 from db.models import User, Device, ManagedDevice
+from utils.data_transform_utils import group_office_location_to_flat_table
 
 app = FastAPI()
 
@@ -707,3 +708,19 @@ def managed_devices_paginated_api(
             "limit": _limit,
         },
     }
+
+
+# API for cleaned User.office_location
+@app.get("/users/office_location/grouped-by-region-and-city")
+def users_office_location_grouped(db: Session = Depends(get_db)):
+    data = db.query(User.office_location).all()
+
+    office_locations = list(
+        {
+            row._mapping.get("office_location")
+            for row in data
+            if row._mapping.get("office_location") is not None
+        }
+    )
+
+    return {"data": group_office_location_to_flat_table(office_locations)}
