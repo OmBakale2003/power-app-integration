@@ -1,17 +1,47 @@
-from collections import defaultdict
+import os
 import pprint
+from collections import defaultdict
+from contextlib import asynccontextmanager
+import logging
 
 from fastapi import FastAPI, Depends, HTTPException
-from numpy import sort
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
+
 from db.database import Database
 from db.models import User, Device, ManagedDevice
 from utils.data_transform_utils import group_office_location_to_flat_table
 
-app = FastAPI()
+# Import our new scheduler logic
+from scheduler.scheduler import setup_scheduler
 
-db_instance = Database("sqlite:///data.db")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting up FastAPI and Background Scheduler...")
+
+    # Initialize and start the scheduler
+    scheduler = setup_scheduler()
+    scheduler.start()
+
+    yield  # Application is now running and serving requests
+
+    # Shutdown gracefully
+    logger.info("Shutting down FastAPI and Background Scheduler...")
+    scheduler.shutdown(wait=False)
+
+
+# Attach lifespan to FastAPI
+app = FastAPI(lifespan=lifespan)
+
+# Database setup for the API
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data.db")
+db_instance = Database(DATABASE_URL)
 
 
 def get_db():
