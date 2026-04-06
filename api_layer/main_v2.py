@@ -1,4 +1,8 @@
+from collections import defaultdict
+import pprint
+
 from fastapi import FastAPI, Depends, HTTPException
+from numpy import sort
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from db.database import Database
@@ -723,4 +727,15 @@ def users_office_location_grouped(db: Session = Depends(get_db)):
         }
     )
 
-    return {"data": group_office_location_to_flat_table(office_locations)}
+    data_to_return = group_office_location_to_flat_table(office_locations)
+
+    """ freq = defaultdict(int)
+
+    for row in data_to_return:
+        freq[row["original_value"]] += 1
+
+    freq = dict(sorted(freq.items(), key=lambda item: item[0]))
+
+    pprint.pp(freq) """
+
+    return {"data": data_to_return}

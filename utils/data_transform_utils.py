@@ -18,7 +18,8 @@ CITY_MAP = {
     # India
     "bangalore": "bengaluru",
     "bengaluru": "bengaluru",
-    "pune": "pune",
+    "PUNE": "pune",
+    "Pune": "pune",
     "chennai": "chennai",
     "hyderabad": "hyderabad",
     "mumbai": "mumbai",

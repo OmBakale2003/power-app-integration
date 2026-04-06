@@ -107,6 +107,9 @@ logs/
 #exclude test script output
 test_scripts/graph_test_output/
 
+#exclude test script/ sensitive data folder.
+test_scripts/sensitive_tests/
+
 #exclude the db files
 *.db
 *.db-*
