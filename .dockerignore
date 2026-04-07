@@ -1,12 +1,15 @@
 # Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+
+**pycache**/
+_.py[cod]
+_$py.class
 
 # C extensions
-*.so
+
+\*.so
 
 # Distribution / packaging
+
 .Python
 build/
 develop-eggs/
@@ -22,83 +25,97 @@ var/
 wheels/
 pip-wheel-metadata/
 share/python-wheels/
-*.egg-info/
+_.egg-info/
 .installed.cfg
-*.egg
+_.egg
 MANIFEST
 
 # PyInstaller
-*.manifest
-*.spec
+
+_.manifest
+_.spec
 
 # Installer logs
+
 pip-log.txt
 pip-delete-this-directory.txt
 
 # Unit test / coverage reports
+
 htmlcov/
 .tox/
 .nox/
 .coverage
-.coverage.*
+.coverage._
 .cache
 nosetests.xml
 coverage.xml
-*.cover
+_.cover
 .hypothesis/
 .pytest_cache/
 
 # Translations
-*.mo
-*.pot
+
+_.mo
+_.pot
 
 # Django stuff:
-*.log
+
+\*.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
 # MyPy
+
 .mypy_cache/
 .dmypy.json
 dmypy.json
 
 # Pyre type checker
+
 .pyre/
 
 # Environment variables
+
 .env
-*.env
+\*.env
 
 # Virtual environment
+
 venv/
 .venv/
 env/
 ENV/
 
 # IDEs and Editors
+
 .vscode/
 .idea/
-*.swp
-*.sublime-*
+_.swp
+_.sublime-\*
 
 # OS generated files
-.DS_Store
+
+.DS*Store
 .DS_Store?
-._*
+.*\*
 .Spotlight-V100
 .Trashes
 ehthumbs.db
 Thumbs.db
 
 # Windows thumbs
+
 $RECYCLE.BIN/
 
 # Your existing cache
-__pycache__/
+
+**pycache**/
 
 # Logs
-*.log
+
+\*.log
 logs/
 
 #exclude test script output
@@ -108,9 +125,31 @@ test_scripts/graph_test_output/
 test_scripts/sensitive_tests/
 
 #exclude the db files
-*.db
-*.db-*
+_.db
+_.db-_
 .delta_links.json
 debug_dumps/
-*.csv
+_.csv
 data_cache/
+
+# --- DOCKER SPECIFIC EXCLUSIONS ---
+
+# Exclude the Dockerfile itself (it is not needed inside the container)
+
+Dockerfile
+.dockerignore
+
+# Exclude any README or markdown files to save space
+
+\*.md
+README.md
+
+# Ensure ALL environment variable files are ignored (Critical for security)
+
+.env
+.env.\*
+
+# Exclude Git history (Critical for build speed)
+
+.git/
+.gitignore

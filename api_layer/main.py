@@ -1,400 +1,771 @@
-from fastapi import FastAPI
-import sqlite3
+import os
+import pprint
+from collections import defaultdict
+from contextlib import asynccontextmanager
+import logging
 
-app = FastAPI()
-DB_name = "data.db"
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
+from sqlalchemy import func, or_
 
+from db.database import Database
+from db.models import User, Device, ManagedDevice
+from utils.data_transform_utils import group_office_location_to_flat_table
 
-def query_db(query, params=()):
-    conn = sqlite3.connect(DB_name)
-    cursor = conn.cursor()
-    cursor.execute(query, params)
-    columns = [col[0] for col in cursor.description]
-    rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
-    conn.close()
-    return rows
+# Import our new scheduler logic
+from scheduler.scheduler import setup_scheduler
 
-
-@app.get("/user/count")
-def get_all_users():
-    result = query_db("select count(*) as total_users from users")
-    return result
-
-
-@app.get("/user/byLoc")
-def get_user_byLoc(location: str):
-    query = """
-    SELECT u.id, u.display_name, u.job_title, u.mail, u.mobile_phone, u.office_location
-    FROM users u
-    WHERE u.office_location = ?
-    """
-    rows = query_db(query, (location,))
-    return rows
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
-@app.get("/user/user_By_mail")
-def get_user_byMail(mail: str):
-    query = """
-    SELECT u.id, u.display_name, u.job_title, u.mail, u.mobile_phone, u.office_location
-    FROM users u
-    WHERE u.mail = ?
-    """
-    rows = query_db(query, (mail,))
-    return rows
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting up FastAPI and Background Scheduler...")
+
+    # Initialize and start the scheduler
+    scheduler = setup_scheduler()
+    scheduler.start()
+
+    yield  # Application is now running and serving requests
+
+    # Shutdown gracefully
+    logger.info("Shutting down FastAPI and Background Scheduler...")
+    scheduler.shutdown(wait=False)
 
 
-@app.get("/user/user_By_id")
-def get_user_byId(Id: str):
-    query = """
-    SELECT u.id, u.display_name, u.job_title, u.mail, u.mobile_phone, u.office_location
-    FROM users u
-    WHERE u.id = ?
-    """
-    rows = query_db(query, (Id,))
-    return rows
+# Attach lifespan to FastAPI
+app = FastAPI(lifespan=lifespan)
+
+# Database setup for the API
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data.db")
+db_instance = Database(DATABASE_URL)
 
 
-@app.get("/device/count")
-def get_all_devices():
-    result = query_db("select count(*) as total_devices from devices")
-    return result
+def get_db():
+    with db_instance.get_session() as session:
+        yield session
 
 
-@app.get("/device/device_by_userid")
-def get_Device_byUserId(UserId: str):
-    query = """
-    SELECT d.id,d.device_category,d.device_id,d.device_ownership,d.device_version,d.display_name,d.domain_name
-    FROM devices d
-    WHERE d.user_id = ?
-    """
-    rows = query_db(query, (UserId,))
-    return rows
+# -- default path response
+@app.get("/")
+def home_path():
+    return "server is up and running."
 
 
-@app.get("/device/Count_managed_Devices")
-def Count_ManagedDevices():
-    query = """
-    SELECT count(*) as company_managed_devices
-    FROM devices
-    WHERE device_ownership='Company'
-    """
-    rows = query_db(query)
-    return rows
+# USERS
+@app.get("/users/all")
+def get_all_users(db: Session = Depends(get_db)):
+
+    users = db.query(
+        User.id,
+        User.display_name,
+        User.job_title,
+        User.mail,
+        User.mobile_phone,
+        User.office_location,
+    ).all()
+
+    return [row._asdict() for row in users]
 
 
-@app.get("/device/Get_all_ManagedDevices")
-def get_ManagedDevices(device_ownerShip: str):
-    query = """
-    SELECT *
-    FROM devices
-    WHERE device_ownership = ?
-    """
-    rows = query_db(query, (device_ownerShip,))
-    return rows
+@app.get("/users/count")
+def get_user_count(db: Session = Depends(get_db)):
+    total = db.query(func.count(User.id)).scalar()
+    return {"total_users": total}
 
 
-@app.get("/device/get_using_wifi_Mac")
-def get_device_ByMac(wi_fi_mac_address: str):
-    query = """
-    SELECT *
-    FROM managed_devices
-    WHERE wi_fi_mac_address = ?
-    """
-    rows = query_db(query, (wi_fi_mac_address,))
-    return rows
+@app.get("/users/by-location")
+def get_users_by_location(location: str, db: Session = Depends(get_db)):
+    users = (
+        db.query(
+            User.id,
+            User.display_name,
+            User.job_title,
+            User.mail,
+            User.mobile_phone,
+            User.office_location,
+        )
+        .filter(User.office_location == location)
+        .all()
+    )
+    return [row._asdict() for row in users]
 
 
-@app.get("/user/byJobTitle")
-def get_users_by_job_title(job_title: str):
-    query = """
-    SELECT u.id, u.display_name, u.job_title, u.mail, u.mobile_phone, u.office_location
-    FROM users u
-    WHERE u.job_title = ?
-    """
-    rows = query_db(query, (job_title,))
-    return rows
+@app.get("/users/by-mail")
+def get_user_by_mail(mail: str, db: Session = Depends(get_db)):
+    users = (
+        db.query(
+            User.id,
+            User.display_name,
+            User.job_title,
+            User.mail,
+            User.mobile_phone,
+            User.office_location,
+        )
+        .filter(User.mail == mail)
+        .all()
+    )
+    return [row._asdict() for row in users]
 
 
-@app.get("/device/byUserMail")
-def get_devices_by_user_mail(mail: str):
-    query = """
-    SELECT 
-        m.id,
-        m.device_name,
-        m.operating_system,
-        m.os_version,
-        m.manufacturer,
-        m.model,
-        m.wi_fi_mac_address
-    FROM managed_devices m
-    JOIN users u ON u.id = m.user_id
-    WHERE u.mail = ?
-    """
-    rows = query_db(query, (mail,))
-    return rows
+@app.get("/users/by-id")
+def get_user_by_id(id: str, db: Session = Depends(get_db)):
+    users = (
+        db.query(
+            User.id,
+            User.display_name,
+            User.job_title,
+            User.mail,
+            User.mobile_phone,
+            User.office_location,
+        )
+        .filter(User.id == id)
+        .all()
+    )
+    return [row._asdict() for row in users]
 
 
-@app.get("/device/getAllDeviceUsingMail")
-def get_devices_by_user_mail_all(mail: str):
-    query = """
-    SELECT 
-        d.id,
-        d.device_id,
-        d.display_name,
-        d.domain_name,
-        d.device_ownership,
-        d.operating_system
-    FROM devices d
-    JOIN users u ON u.id = d.user_id
-    WHERE u.mail = ?
-    """
-    rows = query_db(query, (mail,))
-    return rows
+@app.get("/users/by-job-title")
+def get_users_by_job_title(job_title: str, db: Session = Depends(get_db)):
+    users = (
+        db.query(
+            User.id,
+            User.display_name,
+            User.job_title,
+            User.mail,
+            User.mobile_phone,
+            User.office_location,
+        )
+        .filter(User.job_title == job_title)
+        .all()
+    )
+    return [row._asdict() for row in users]
 
 
-@app.get("/device/getUsingAd")
-def getDeviceByAd(azure_ad_device_id: str):
-    query = """
-    SELECT 
-        m.id,
-        m.user_id,
-        m.device_name,
-        m.managed_device_name,
-        m.email_address,
-        m.user_display_name,
-        m.model
-    FROM managed_devices m
-    WHERE m.azure_ad_device_id = ?
-    """
-    rows = query_db(query, (azure_ad_device_id,))
-    return rows
+# DEVICES
+
+
+@app.get("/devices/count")
+def get_device_count(db: Session = Depends(get_db)):
+    total = db.query(func.count(Device.id)).scalar()
+    return {"total_devices": total}
+
+
+@app.get("/devices/count/by-os")
+def count_devices_by_os(operating_system: str, db: Session = Depends(get_db)):
+    total = (
+        db.query(func.count(Device.id))
+        .filter(Device.operating_system == operating_system)
+        .scalar()
+    )
+    return {"operating_system": operating_system, "count": total}
+
+
+@app.get("/devices/count/by-ownership")
+def count_devices_by_ownership(ownership: str, db: Session = Depends(get_db)):
+    total = (
+        db.query(func.count(Device.id))
+        .filter(Device.device_ownership == ownership)
+        .scalar()
+    )
+    return {"ownership": ownership, "count": total}
+
+
+@app.get("/devices/count/windows")
+def count_windows_devices(db: Session = Depends(get_db)):
+    total = (
+        db.query(func.count(Device.id))
+        .filter(Device.operating_system == "Windows")
+        .scalar()
+    )
+    return {"count": total}
+
+
+@app.get("/devices/count/ios")
+def count_ios_devices(db: Session = Depends(get_db)):
+    total = (
+        db.query(func.count(Device.id))
+        .filter(
+            or_(Device.operating_system == "iOS", Device.operating_system == "IPhone")
+        )
+        .scalar()
+    )
+    return {"count": total}
+
+
+@app.get("/devices/count/macos")
+def count_macos_devices(db: Session = Depends(get_db)):
+    total = (
+        db.query(func.count(Device.id))
+        .filter(Device.operating_system == "MacOS")
+        .scalar()
+    )
+    return {"count": total}
+
+
+@app.get("/devices/count/android")
+def count_android_devices(db: Session = Depends(get_db)):
+    total = (
+        db.query(func.count(Device.id))
+        .filter(
+            or_(
+                Device.operating_system == "Android",
+                Device.operating_system == "AndroidForWork",
+            )
+        )
+        .scalar()
+    )
+    return {"count": total}
+
+
+@app.get("/devices/count/mac-mdm")
+def count_macmdm_devices(db: Session = Depends(get_db)):
+    total = (
+        db.query(func.count(Device.id))
+        .filter(Device.operating_system == "MacMDM")
+        .scalar()
+    )
+    return {"count": total}
+
+
+@app.get("/devices/count/linux")
+def count_linux_devices(db: Session = Depends(get_db)):
+    total = (
+        db.query(func.count(Device.id))
+        .filter(Device.operating_system == "Linux")
+        .scalar()
+    )
+    return {"count": total}
 
 
 @app.get("/devices/by-os")
-def get_devices_by_os(operating_system: str):
-    query = """
-    SELECT 
-        d.id,
-        d.user_id,
-        d.device_category,
-        d.device_id,
-        d.device_Ownership,
-        d.model,
-        d.display_name,
-        d.device_ownership,
-        d.operating_system
-    FROM devices d
-    WHERE d.operating_system = ?
-    """
-    rows = query_db(query, (operating_system,))
-    return rows
+def get_devices_by_os(operating_system: str, db: Session = Depends(get_db)):
+    devices = (
+        db.query(
+            Device.id,
+            Device.user_id,
+            Device.device_category,
+            Device.device_id,
+            Device.device_ownership,
+            Device.model,
+            Device.display_name,
+            Device.operating_system,
+        )
+        .filter(Device.operating_system == operating_system)
+        .all()
+    )
+    return [row._asdict() for row in devices]
 
 
-@app.get("/devices/count/Windows")
-def get_windows_devices():
-    query = """
-       select count(*) from devices where operating_System="Windows"
-
-    """
-    rows = query_db(query)
-    return rows
+@app.get("/devices/by-ownership")
+def get_devices_by_ownership(ownership: str, db: Session = Depends(get_db)):
+    devices = db.query(Device).filter(Device.device_ownership == ownership).all()
+    return devices
 
 
-@app.get("/devices/count/iphone")
-def get_ios_devices():
-    query = """
-       select count(*) from devices where operating_System="iOS" or operating_System="IPhone"
-
-    """
-    rows = query_db(query)
-    return rows
-
-
-@app.get("/devices/count/MacOS")
-def get_macos_devices():
-    query = """
-        select count(*) from devices where operating_System="MacOS"
-    """
-    rows = query_db(query)
-    return rows
-
-
-@app.get("/devices/count/Android")
-def get_android_devices():
-    query = """
-        select count(*) from devices where operating_System="Android" or operating_System="AndroidForWork"
-
-    """
-    rows = query_db(query)
-    return rows
+@app.get("/devices/by-user-id")
+def get_devices_by_user_id(user_id: str, db: Session = Depends(get_db)):
+    devices = (
+        db.query(
+            Device.id,
+            Device.device_category,
+            Device.device_id,
+            Device.device_ownership,
+            Device.device_version,
+            Device.display_name,
+            Device.domain_name,
+        )
+        .filter(Device.user_id == user_id)
+        .all()
+    )
+    return [row._asdict() for row in devices]
 
 
-@app.get("/devices/count/MacMDM")
-def get_macmdm_devices():
-    query = """
-    select count(*) from devices where operating_System="MacMDM"
-    """
-    rows = query_db(query)
-    return rows
+@app.get("/devices/by-mail")
+def get_devices_by_mail(mail: str, db: Session = Depends(get_db)):
+    devices = (
+        db.query(
+            Device.id,
+            Device.device_id,
+            Device.display_name,
+            Device.domain_name,
+            Device.device_ownership,
+            Device.operating_system,
+        )
+        .join(User, User.id == Device.user_id)
+        .filter(User.mail == mail)
+        .all()
+    )
+    return [row._asdict() for row in devices]
 
 
-@app.get("/devices/count/Linux")
-def get_macmdm_devices():
-    query = """
-    select count(*) from devices where operating_System="Linux"
-    """
-    rows = query_db(query)
-    return rows
+# MANAGED DEVICES
+
+_MANAGED_DEVICE_FIELDS = (
+    ManagedDevice.id,
+    ManagedDevice.user_id,
+    ManagedDevice.managed_device_name,
+    ManagedDevice.azure_ad_device_id,
+    ManagedDevice.email_address,
+    ManagedDevice.user_display_name,
+    ManagedDevice.model,
+    ManagedDevice.manufacturer,
+    ManagedDevice.wi_fi_mac_address,
+    ManagedDevice.device_enrollment_type,
+    ManagedDevice.operating_system,
+)
 
 
-@app.get("/ManagedDevices")
-def get_all_managedDevices():
-    query = """
-    select count(*) from managed_devices"""
-    rows = query_db(query)
-    return rows
+@app.get("/managed-devices/count")
+def count_all_managed_devices(db: Session = Depends(get_db)):
+    total = db.query(func.count(ManagedDevice.id)).scalar()
+    return {"count": total}
 
 
-@app.get("/ManagedDevices/ios")
-def get_ios_devices():
-    query = """
-    SELECT 
-        d.id,
-        d.user_id,
-        d.managed_device_name,
-        d.azure_ad_device_id,
-        d.email_address,
-        d.user_display_name,
-        d.model,
-        d.manufacturer,
-        d.wi_fi_mac_address,
-        d.device_enrollment_type,
-        d.operating_system
-    FROM managed_devices d
-    WHERE d.operating_system = "iOS"
-    """
-    rows = query_db(query)
-    return rows
+@app.get("/managed-devices/count/by-location")
+def count_managed_devices_by_location(location: str, db: Session = Depends(get_db)):
+    total = (
+        db.query(func.count(ManagedDevice.id))
+        .join(User, User.id == ManagedDevice.user_id)
+        .filter(User.office_location == location)
+        .scalar()
+    )
+    return {"location": location, "count": total}
 
 
-@app.get("/ManagedDevices/android")
-def get_ios_devices():
-    query = """
-    SELECT 
-        d.id,
-        d.user_id,
-        d.managed_device_name,
-        d.azure_ad_device_id,
-        d.email_address,
-        d.user_display_name,
-        d.model,
-        d.manufacturer,
-        d.wi_fi_mac_address,
-        d.device_enrollment_type,
-        d.operating_system
-    FROM managed_devices d
-    WHERE d.operating_system = "Android"
-    """
-    rows = query_db(query)
-    return rows
+@app.get("/managed-devices/count/all-locations")
+def count_managed_devices_all_locations(db: Session = Depends(get_db)):
+    results = (
+        db.query(User.office_location, func.count(ManagedDevice.id).label("count"))
+        .join(ManagedDevice, ManagedDevice.user_id == User.id)
+        .filter(User.office_location.isnot(None))
+        .group_by(User.office_location)
+        .all()
+    )
+    return [{"location": row.office_location, "count": row.count} for row in results]
 
 
-@app.get("/ManagedDevices/macos")
-def get_ios_devices():
-    query = """
-    SELECT 
-        d.id,
-        d.user_id,
-        d.managed_device_name,
-        d.azure_ad_device_id,
-        d.email_address,
-        d.user_display_name,
-        d.model,
-        d.manufacturer,
-        d.wi_fi_mac_address,
-        d.device_enrollment_type,
-        d.operating_system
-    FROM managed_devices d
-    WHERE d.operating_system = "macOS"
-    """
-    rows = query_db(query)
-    return rows
+@app.get("/managed-devices/by-wifi-mac")
+def get_device_by_wifi_mac(wi_fi_mac_address: str, db: Session = Depends(get_db)):
+    devices = (
+        db.query(ManagedDevice)
+        .filter(ManagedDevice.wi_fi_mac_address == wi_fi_mac_address)
+        .all()
+    )
+    return devices
 
 
-@app.get("/ManagedDevices/linux")
-def get_ios_devices():
-    query = """
-    SELECT 
-        d.id,
-        d.user_id,
-        d.managed_device_name,
-        d.azure_ad_device_id,
-        d.email_address,
-        d.user_display_name,
-        d.model,
-        d.manufacturer,
-        d.wi_fi_mac_address,
-        d.device_enrollment_type,
-        d.operating_system
-    FROM managed_devices d
-    WHERE d.operating_system = "Linux (ubuntu)"
-    """
-    rows = query_db(query)
-    return rows
+@app.get("/managed-devices/count/unassigned")
+def count_managed_devices_without_user(db: Session = Depends(get_db)):
+    total = (
+        db.query(func.count(ManagedDevice.id))
+        .filter(ManagedDevice.user_id.is_(None))
+        .scalar()
+    )
+    return {"count": total}
 
 
-@app.get("/ManagedDevices/count/Windows")
-def get_windows_devices():
-    query = """
-       select count(*) from managed_devices where operating_System="Windows"
-
-    """
-    rows = query_db(query)
-    return rows
-
-
-@app.get("/ManagedDevices/count/iphone")
-def get_ios_devices():
-    query = """
-       select count(*) from managed_devices where operating_System="iOS" or operating_System="IPhone"
-
-    """
-    rows = query_db(query)
-    return rows
+@app.get("/managed-devices/count/windows")
+def count_managed_windows(db: Session = Depends(get_db)):
+    total = (
+        db.query(func.count(ManagedDevice.id))
+        .filter(ManagedDevice.operating_system == "Windows")
+        .scalar()
+    )
+    return {"count": total}
 
 
-@app.get("/ManagedDevices/count/MacOS")
-def get_macos_devices():
-    query = """
-        select count(*) from managed_devices where operating_System="MacOS"
-    """
-    rows = query_db(query)
-    return rows
+@app.get("/managed-devices/count/ios")
+def count_managed_ios(db: Session = Depends(get_db)):
+    total = (
+        db.query(func.count(ManagedDevice.id))
+        .filter(
+            or_(
+                ManagedDevice.operating_system == "iOS",
+                ManagedDevice.operating_system == "IPhone",
+            )
+        )
+        .scalar()
+    )
+    return {"count": total}
 
 
-@app.get("/ManagedDevices/count/Android")
-def get_android_devices():
-    query = """
-        select count(*) from managed_devices where operating_System="Android" or operating_System="AndroidForWork"
-
-    """
-    rows = query_db(query)
-    return rows
-
-
-@app.get("/ManagedDevices/count/MacMDM")
-def get_macmdm_devices():
-    query = """
-    select count(*) from managed_devices where operating_System="MacMDM"
-    """
-    rows = query_db(query)
-    return rows
+@app.get("/managed-devices/count/macos")
+def count_managed_macos(db: Session = Depends(get_db)):
+    total = (
+        db.query(func.count(ManagedDevice.id))
+        .filter(ManagedDevice.operating_system == "macOS")
+        .scalar()
+    )
+    return {"count": total}
 
 
-@app.get("/ManagedDevices/count/Linux")
-def get_macmdm_devices():
-    query = """
-    select count(*) from managed_devices where operating_System="Linux"
-    """
-    rows = query_db(query)
-    return rows
+@app.get("/managed-devices/count/android")
+def count_managed_android(db: Session = Depends(get_db)):
+    total = (
+        db.query(func.count(ManagedDevice.id))
+        .filter(
+            or_(
+                ManagedDevice.operating_system == "Android",
+                ManagedDevice.operating_system == "AndroidForWork",
+            )
+        )
+        .scalar()
+    )
+    return {"count": total}
+
+
+@app.get("/managed-devices/count/linux")
+def count_managed_linux(db: Session = Depends(get_db)):
+    total = (
+        db.query(func.count(ManagedDevice.id))
+        .filter(ManagedDevice.operating_system == "Linux (ubuntu)")
+        .scalar()
+    )
+    return {"count": total}
+
+
+@app.get("/managed-devices/by-azure-ad-id")
+def get_device_by_azure_ad_id(azure_ad_device_id: str, db: Session = Depends(get_db)):
+    devices = (
+        db.query(
+            ManagedDevice.id,
+            ManagedDevice.user_id,
+            ManagedDevice.device_name,
+            ManagedDevice.managed_device_name,
+            ManagedDevice.email_address,
+            ManagedDevice.user_display_name,
+            ManagedDevice.model,
+        )
+        .filter(ManagedDevice.azure_ad_device_id == azure_ad_device_id)
+        .all()
+    )
+    return [row._asdict() for row in devices]
+
+
+@app.get("/managed-devices/ios")
+def get_managed_ios_devices(db: Session = Depends(get_db)):
+    devices = (
+        db.query(*_MANAGED_DEVICE_FIELDS)
+        .filter(ManagedDevice.operating_system == "iOS")
+        .all()
+    )
+    return [row._asdict() for row in devices]
+
+
+@app.get("/managed-devices/android")
+def get_managed_android_devices(db: Session = Depends(get_db)):
+    devices = (
+        db.query(*_MANAGED_DEVICE_FIELDS)
+        .filter(ManagedDevice.operating_system == "Android")
+        .all()
+    )
+    return [row._asdict() for row in devices]
+
+
+@app.get("/managed-devices/macos")
+def get_managed_macos_devices(db: Session = Depends(get_db)):
+    devices = (
+        db.query(*_MANAGED_DEVICE_FIELDS)
+        .filter(ManagedDevice.operating_system == "macOS")
+        .all()
+    )
+    return [row._asdict() for row in devices]
+
+
+@app.get("/managed-devices/linux")
+def get_managed_linux_devices(db: Session = Depends(get_db)):
+    devices = (
+        db.query(*_MANAGED_DEVICE_FIELDS)
+        .filter(ManagedDevice.operating_system == "Linux (ubuntu)")
+        .all()
+    )
+    return [row._asdict() for row in devices]
+
+
+@app.get("/managed-devices/by-mail")
+def get_managed_devices_by_mail(mail: str, db: Session = Depends(get_db)):
+    devices = (
+        db.query(
+            ManagedDevice.id,
+            ManagedDevice.device_name,
+            ManagedDevice.operating_system,
+            ManagedDevice.os_version,
+            ManagedDevice.manufacturer,
+            ManagedDevice.model,
+            ManagedDevice.wi_fi_mac_address,
+        )
+        .join(User, User.id == ManagedDevice.user_id)
+        .filter(User.mail == mail)
+        .all()
+    )
+    return [row._asdict() for row in devices]
+
+
+# specific endpoints for power bi.
+@app.get("/power-bi/api-1")
+def get_count_of_devices_groupedby_user_job_titles_and_location(
+    db: Session = Depends(get_db),
+):
+    try:
+        result = (
+            db.query(
+                func.count(ManagedDevice.id).label("device_count"),
+                User.job_title,
+                User.office_location,
+            )
+            .join(User, User.id == ManagedDevice.user_id)
+            .filter(User.office_location.is_not(None))
+            .group_by(User.office_location, User.job_title)
+            .all()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return [
+        {
+            "device_count": row.device_count,
+            "job_title": row.job_title,
+            "office_location": row.office_location,
+        }
+        for row in result
+    ]
+
+
+# Paginated APIs
+@app.get("/users")
+def user_paginated_api(
+    _page: int | None = None,
+    _select: str | None = None,
+    _skip: int | None = None,
+    _limit: int = 10,
+    db: Session = Depends(get_db),
+):
+    selected_fields = [f.strip() for f in _select.split(",")] if _select else None
+
+    if selected_fields:
+        column_attributes = []
+        for field in selected_fields:
+            attr = getattr(User, field, None)
+            if attr is None:
+                raise HTTPException(status_code=400, detail=f"Invalid field: '{field}'")
+            column_attributes.append(attr)
+        query = db.query(*column_attributes)
+    else:
+        query = db.query(User)
+
+    total = query.count()
+    full_data = query.all()
+
+    if _page is None and _skip is None:
+        return {
+            "data": [dict(row._mapping) for row in full_data]
+            if selected_fields
+            else full_data
+        }
+
+    if _page is not None:
+        if _skip is not None:
+            raise HTTPException(
+                status_code=400, detail="Use either _page or _skip, not both"
+            )
+        _skip = (_page - 1) * _limit if _limit else 0
+
+    if _skip is not None:
+        query = query.offset(_skip)
+
+    query = query.limit(_limit)
+    paginated_data = query.all()
+
+    serialized = (
+        [dict(row._mapping) for row in paginated_data]
+        if selected_fields
+        else paginated_data
+    )
+
+    next_idx = (_skip or 0) + len(paginated_data)
+    can_continue = next_idx < total
+
+    return {
+        "data": serialized,
+        "pagination": {
+            "total_count": total,
+            "current_count": len(paginated_data),
+            "can_continue": can_continue,
+            "current_page": _page,
+            "current_skip": _skip,
+            "next_page": _page + 1 if _page and can_continue else None,
+            "next_skip": next_idx if can_continue else None,
+            "limit": _limit,
+        },
+    }
+
+
+@app.get("/devices")
+def devices_paginated_api(
+    _page: int | None = None,
+    _select: str | None = None,
+    _skip: int | None = None,
+    _limit: int = 10,
+    db: Session = Depends(get_db),
+):
+    selected_fields = [f.strip() for f in _select.split(",")] if _select else None
+
+    if selected_fields:
+        column_attributes = []
+        for field in selected_fields:
+            attr = getattr(Device, field, None)
+            if attr is None:
+                raise HTTPException(status_code=400, detail=f"Invalid field: '{field}'")
+            column_attributes.append(attr)
+        query = db.query(*column_attributes)
+    else:
+        query = db.query(Device)
+
+    full_data = query.all()
+
+    if _page is None and _skip is None:
+        return {
+            "data": [dict(row._mapping) for row in full_data]
+            if selected_fields
+            else full_data
+        }
+
+    total = query.count()
+
+    if _page is not None:
+        if _skip is not None:
+            raise HTTPException(
+                status_code=400, detail="Use either _page or _skip, not both"
+            )
+        _skip = (_page - 1) * _limit
+
+    if _skip is not None:
+        query = query.offset(_skip)
+
+    query = query.limit(_limit)
+
+    paginated_data = query.all()
+
+    serialized = (
+        [dict(row._mapping) for row in paginated_data]
+        if selected_fields
+        else paginated_data
+    )
+
+    next_idx = (_skip or 0) + len(paginated_data)
+    can_continue = next_idx < total
+
+    return {
+        "data": serialized,
+        "pagination": {
+            "total_count": total,
+            "current_count": len(paginated_data),
+            "can_continue": can_continue,
+            "current_page": _page,
+            "current_skip": _skip,
+            "next_page": _page + 1 if _page and can_continue else None,
+            "next_skip": next_idx if can_continue else None,
+            "limit": _limit,
+        },
+    }
+
+
+@app.get("/managed_devices")
+def managed_devices_paginated_api(
+    _page: int | None = None,
+    _select: str | None = None,
+    _skip: int | None = None,
+    _limit: int = 10,
+    db: Session = Depends(get_db),
+):
+    selected_fields = [f.strip() for f in _select.split(",")] if _select else None
+
+    if selected_fields:
+        column_attributes = []
+        for field in selected_fields:
+            attr = getattr(ManagedDevice, field, None)
+            if attr is None:
+                raise HTTPException(status_code=400, detail=f"Invalid field: '{field}'")
+            column_attributes.append(attr)
+        query = db.query(*column_attributes)
+    else:
+        query = db.query(ManagedDevice)
+
+    total = query.count()
+
+    full_data = query.all()
+
+    if _page is None and _skip is None:
+        return {
+            "data": [dict(row._mapping) for row in full_data]
+            if selected_fields
+            else full_data
+        }
+
+    if _page is not None:
+        if _skip is not None:
+            raise HTTPException(
+                status_code=400, detail="Use either _page or _skip, not both"
+            )
+        _skip = (_page - 1) * _limit
+
+    if _skip is not None:
+        query = query.offset(_skip)
+
+    query = query.limit(_limit)
+
+    paginated_data = query.all()
+
+    serialized = (
+        [dict(row._mapping) for row in paginated_data]
+        if selected_fields
+        else paginated_data
+    )
+
+    next_idx = (_skip or 0) + len(paginated_data)
+    can_continue = next_idx < total
+
+    return {
+        "data": serialized,
+        "pagination": {
+            "total_count": total,
+            "current_count": len(paginated_data),
+            "can_continue": can_continue,
+            "current_page": _page,
+            "current_skip": _skip,
+            "next_page": _page + 1 if _page and can_continue else None,
+            "next_skip": next_idx if can_continue else None,
+            "limit": _limit,
+        },
+    }
+
+
+# API for cleaned User.office_location
+@app.get("/users/office_location/grouped-by-region-and-city")
+def users_office_location_grouped(db: Session = Depends(get_db)):
+    data = db.query(User.office_location).all()
+
+    office_locations = list(
+        {
+            row._mapping.get("office_location")
+            for row in data
+            if row._mapping.get("office_location") is not None
+        }
+    )
+
+    data_to_return = group_office_location_to_flat_table(office_locations)
+
+    """ freq = defaultdict(int)
+
+    for row in data_to_return:
+        freq[row["original_value"]] += 1
+
+    freq = dict(sorted(freq.items(), key=lambda item: item[0]))
+
+    pprint.pp(freq) """
+
+    return {"data": data_to_return}

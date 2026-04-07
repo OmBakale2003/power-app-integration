@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 USER_TO_DEVICES_JSON_PATH = Path("./data_cache/user_to_devices.json")
 USER_TO_DEVICES_JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-CACHE_TTL_HOURS = 12
+CACHE_TTL_HOURS = 48
 
 
 def _load_cache() -> dict[str, str] | None:
