@@ -1,1 +1,0 @@
-### if running the application locally make sure to define a relative path of the sqlite db (var - DATABASE_URL) . Example - sqlite:///data.db (by default the container will point to fixed file path to avoid errors during deployment)
