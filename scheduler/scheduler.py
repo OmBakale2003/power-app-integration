@@ -1,10 +1,13 @@
+from datetime import datetime, timedelta
 import os
 import logging
 import time
 from requests.exceptions import SSLError
 
+from config import DATABASE_URL
 from db.database import Database
 from data_extraction.graph_data_extractor import GraphDataExtractor
+from db.models import User
 from pipelines.user_data_pipeline import UsersPipeline
 from pipelines.device_data_pipeline import DevicesPipeline
 from pipelines.managed_device_data_pipeline import ManagedDevicesPipeline
@@ -16,7 +19,6 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 logger = logging.getLogger(__name__)
 
 # Note: In production, ensure DATABASE_URL is an Azure PostgreSQL connection string
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data.db")
 db = Database(DATABASE_URL)
 extractor = GraphDataExtractor()
 
@@ -80,7 +82,27 @@ def setup_scheduler() -> BackgroundScheduler:
         replace_existing=True,
     )
 
-    # Optional: Initial run on startup
-    scheduler.add_job(func=run_pipelines, id="immediate_run", replace_existing=True)
+    # immediate first time run
+    with db.get_session() as session:
+        # We query for just one user to see if the pipeline has ever run
+        existing_data = session.query(User.id).first()
+
+        if not existing_data:
+            logger.info(
+                "Database is empty. Scheduling initial data pull in 5 seconds..."
+            )
+
+            run_time = datetime.now() + timedelta(seconds=5)
+
+            scheduler.add_job(
+                func=run_pipelines,
+                trigger="date",
+                run_date=run_time,
+                id="graph_sync_startup",
+                max_instances=1,
+                replace_existing=True,
+            )
+        else:
+            logger.info("Database already contains data. Skipping initial data pull.")
 
     return scheduler

@@ -5,6 +5,7 @@ from pipelines.user_data_pipeline import UsersPipeline
 from pipelines.device_data_pipeline import DevicesPipeline
 from pipelines.managed_device_data_pipeline import ManagedDevicesPipeline
 from urllib3.exceptions import SSLError
+from config import DATABASE_URL
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    db = Database("sqlite:///data.db")
+    db = Database(DATABASE_URL)
     db.create_tables()
 
     extractor = GraphDataExtractor()

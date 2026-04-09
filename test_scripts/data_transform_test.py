@@ -1,8 +1,9 @@
 from db.database import Database
 from db.models import User
 from collections import defaultdict
+from config import DATABASE_URL
 
-db_instance = Database("sqlite:///data.db")
+db_instance = Database(DATABASE_URL)
 
 with db_instance.get_session() as db:
     data = db.query(User.office_location).all()

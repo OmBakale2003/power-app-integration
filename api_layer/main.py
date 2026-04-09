@@ -3,6 +3,7 @@ import pprint
 from collections import defaultdict
 from contextlib import asynccontextmanager
 import logging
+from config import DATABASE_URL
 
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -40,7 +41,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # Database setup for the API
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data.db")
 db_instance = Database(DATABASE_URL)
 
 

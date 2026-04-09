@@ -31,4 +31,4 @@ COPY . .
 EXPOSE 8000
 
 # Command to run the application using Uvicorn
-CMD ["python", "-m", "uvicorn", "api_layer.main_v2:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "api_layer.main:app", "--host", "0.0.0.0", "--port", "8000"]
