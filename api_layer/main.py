@@ -4,6 +4,7 @@ from collections import defaultdict
 from contextlib import asynccontextmanager
 import logging
 from config import DATABASE_URL
+from auth import get_api_key
 
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -38,7 +39,7 @@ async def lifespan(app: FastAPI):
 
 
 # Attach lifespan to FastAPI
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, dependencies=[Depends(get_api_key)])
 
 # Database setup for the API
 db_instance = Database(DATABASE_URL)

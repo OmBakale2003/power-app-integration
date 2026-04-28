@@ -27,6 +27,9 @@ RUN pip install --upgrade pip && \
 # Copy the rest of your application code into the container
 COPY . .
 
+# Create the directory where SQLite will store the database file
+RUN mkdir -p /app/data
+
 # Expose the port Uvicorn will listen on
 EXPOSE 8000
 
